@@ -1,0 +1,141 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null && request.auth.uid != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function isValidRoom(roomId) {
+      return roomId is string && roomId in ['central', 'cafe', 'shop', 'next_street'];
+    }
+
+    function isValidOutfit(outfit) {
+      return outfit is map
+        && outfit.keys().hasAll(['hat', 'top', 'bottom', 'shoes', 'accessory'])
+        && outfit.keys().hasOnly(['hat', 'top', 'bottom', 'shoes', 'accessory'])
+        && outfit.hat is string && outfit.hat.size() <= 40
+        && outfit.top is string && outfit.top.size() <= 40
+        && outfit.bottom is string && outfit.bottom.size() <= 40
+        && outfit.shoes is string && outfit.shoes.size() <= 40
+        && outfit.accessory is string && outfit.accessory.size() <= 40;
+    }
+
+    function isValidUserProfile(data) {
+      return data.keys().hasAll(['uid', 'login', 'name', 'gender', 'race', 'phenotype', 'outfit', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'login', 'name', 'gender', 'race', 'phenotype', 'outfit', 'createdAt', 'updatedAt'])
+        && data.uid is string && data.uid == request.auth.uid && isValidId(data.uid)
+        && data.login is string && data.login.size() >= 2 && data.login.size() <= 32 && data.login.matches('^[a-zA-Z0-9_.-]+$')
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 24
+        && data.gender is string && data.gender in ['male', 'female']
+        && data.race is string && data.race in ['dog', 'cat', 'rabbit']
+        && data.phenotype is string && data.phenotype.size() >= 1 && data.phenotype.size() <= 32
+        && isValidOutfit(data.outfit)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidOnlinePlayer(data) {
+      return data.keys().hasAll(['uid', 'name', 'gender', 'race', 'phenotype', 'outfit', 'roomId', 'x', 'y', 'targetX', 'targetY', 'direction', 'emote', 'emoteTime', 'lastMessage', 'lastMessageTime', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'name', 'gender', 'race', 'phenotype', 'outfit', 'roomId', 'x', 'y', 'targetX', 'targetY', 'direction', 'emote', 'emoteTime', 'lastMessage', 'lastMessageTime', 'updatedAt'])
+        && data.uid is string && data.uid == request.auth.uid && isValidId(data.uid)
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 24
+        && data.gender is string && data.gender in ['male', 'female']
+        && data.race is string && data.race in ['dog', 'cat', 'rabbit']
+        && data.phenotype is string && data.phenotype.size() >= 1 && data.phenotype.size() <= 32
+        && isValidOutfit(data.outfit)
+        && isValidRoom(data.roomId)
+        && data.x is number && data.x >= 0 && data.x <= 2000
+        && data.y is number && data.y >= 0 && data.y <= 1200
+        && data.targetX is number && data.targetX >= 0 && data.targetX <= 2000
+        && data.targetY is number && data.targetY >= 0 && data.targetY <= 1200
+        && data.direction is int && data.direction >= 0 && data.direction <= 7
+        && data.emote is string && data.emote.size() <= 24
+        && data.emoteTime is number && data.emoteTime >= 0
+        && data.lastMessage is string && data.lastMessage.size() <= 220
+        && data.lastMessageTime is number && data.lastMessageTime >= 0
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidChatMessage(data) {
+      return data.keys().hasAll(['uid', 'authorName', 'speakerType', 'roomId', 'text', 'createdAt'])
+        && data.keys().hasOnly(['uid', 'authorName', 'speakerType', 'roomId', 'text', 'createdAt'])
+        && data.uid is string && data.uid == request.auth.uid && isValidId(data.uid)
+        && data.authorName is string && data.authorName.size() >= 1 && data.authorName.size() <= 32
+        && data.speakerType is string && data.speakerType in ['player', 'npc']
+        && isValidRoom(data.roomId)
+        && data.text is string && data.text.size() >= 1 && data.text.size() <= 220
+        && data.createdAt is timestamp;
+    }
+
+    match /users/{uid} {
+      allow get: if isValidId(uid) && isOwner(uid);
+      allow create: if isValidId(uid)
+        && isOwner(uid)
+        && isValidUserProfile(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(uid)
+        && isOwner(uid)
+        && isValidUserProfile(incoming())
+        && incoming().uid == existing().uid
+        && incoming().login == existing().login
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'gender', 'race', 'phenotype', 'outfit', 'updatedAt']);
+      allow delete: if false;
+    }
+
+    match /online_players/{uid} {
+      allow get: if isValidId(uid) && isSignedIn();
+      allow list: if isSignedIn() && isValidRoom(resource.data.roomId);
+      allow create: if isValidId(uid)
+        && isOwner(uid)
+        && isValidOnlinePlayer(incoming())
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(uid)
+        && isOwner(uid)
+        && isValidOnlinePlayer(incoming())
+        && incoming().uid == existing().uid
+        && incoming().updatedAt == request.time
+        && (
+          incoming().diff(existing()).affectedKeys().hasOnly(['x', 'y', 'targetX', 'targetY', 'direction', 'updatedAt'])
+          || incoming().diff(existing()).affectedKeys().hasOnly(['roomId', 'x', 'y', 'targetX', 'targetY', 'direction', 'updatedAt'])
+          || incoming().diff(existing()).affectedKeys().hasOnly(['lastMessage', 'lastMessageTime', 'updatedAt'])
+          || incoming().diff(existing()).affectedKeys().hasOnly(['emote', 'emoteTime', 'updatedAt'])
+          || incoming().diff(existing()).affectedKeys().hasOnly(['name', 'gender', 'race', 'phenotype', 'outfit', 'updatedAt'])
+          || incoming().diff(existing()).affectedKeys().hasOnly(['updatedAt'])
+        );
+      allow delete: if isValidId(uid) && isOwner(uid);
+    }
+
+    match /messages/{messageId} {
+      allow get: if isValidId(messageId) && isSignedIn();
+      allow list: if isSignedIn() && isValidRoom(resource.data.roomId);
+      allow create: if isValidId(messageId)
+        && isSignedIn()
+        && isValidChatMessage(incoming())
+        && incoming().createdAt == request.time;
+      allow update, delete: if false;
+    }
+  }
+}

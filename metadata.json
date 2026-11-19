@@ -1,0 +1,6 @@
+{
+  "name": "ЛапкоГрад — 2D Аватар-Чат",
+  "description": "Многопользовательский 2D аватар-чат в стиле Club Penguin и Шарарам с конструктором персонажей, гардеробом, магазином Dog Style и ИИ-стилистом.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

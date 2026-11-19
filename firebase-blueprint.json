@@ -1,0 +1,87 @@
+{
+  "entities": {
+    "Outfit": {
+      "title": "Outfit",
+      "description": "Equipped clothing and accessories for an avatar.",
+      "type": "object",
+      "properties": {
+        "hat": { "type": "string", "maxLength": 40, "description": "Equipped hat ID" },
+        "top": { "type": "string", "maxLength": 40, "description": "Equipped top ID" },
+        "bottom": { "type": "string", "maxLength": 40, "description": "Equipped bottom ID" },
+        "shoes": { "type": "string", "maxLength": 40, "description": "Equipped shoes ID" },
+        "accessory": { "type": "string", "maxLength": 40, "description": "Equipped accessory ID" }
+      },
+      "required": ["hat", "top", "bottom", "shoes", "accessory"]
+    },
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Persistent player profile and avatar appearance saved per account.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "login": { "type": "string", "minLength": 2, "maxLength": 32, "pattern": "^[a-zA-Z0-9_.-]+$" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 24 },
+        "gender": { "type": "string", "enum": ["male", "female"], "maxLength": 16 },
+        "race": { "type": "string", "enum": ["dog", "cat", "rabbit"], "maxLength": 16 },
+        "phenotype": { "type": "string", "minLength": 1, "maxLength": 32 },
+        "outfit": { "$ref": "#/entities/Outfit" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "login", "name", "gender", "race", "phenotype", "outfit", "createdAt", "updatedAt"]
+    },
+    "OnlinePlayer": {
+      "title": "OnlinePlayer",
+      "description": "Real-time presence, position, direction, outfit, and last speech bubble of an active player.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 24 },
+        "gender": { "type": "string", "enum": ["male", "female"], "maxLength": 16 },
+        "race": { "type": "string", "enum": ["dog", "cat", "rabbit"], "maxLength": 16 },
+        "phenotype": { "type": "string", "minLength": 1, "maxLength": 32 },
+        "outfit": { "$ref": "#/entities/Outfit" },
+        "roomId": { "type": "string", "enum": ["central", "cafe", "shop", "next_street"], "maxLength": 24 },
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "targetX": { "type": "number" },
+        "targetY": { "type": "number" },
+        "direction": { "type": "integer" },
+        "emote": { "type": "string", "maxLength": 24 },
+        "emoteTime": { "type": "number" },
+        "lastMessage": { "type": "string", "maxLength": 220 },
+        "lastMessageTime": { "type": "number" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "name", "gender", "race", "phenotype", "outfit", "roomId", "x", "y", "targetX", "targetY", "direction", "emote", "emoteTime", "lastMessage", "lastMessageTime", "updatedAt"]
+    },
+    "ChatMessage": {
+      "title": "ChatMessage",
+      "description": "Room chat message sent by a player or relayed for the AI stylist NPC.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "authorName": { "type": "string", "minLength": 1, "maxLength": 32 },
+        "speakerType": { "type": "string", "enum": ["player", "npc"], "maxLength": 16 },
+        "roomId": { "type": "string", "enum": ["central", "cafe", "shop", "next_street"], "maxLength": 24 },
+        "text": { "type": "string", "minLength": 1, "maxLength": 220 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "authorName", "speakerType", "roomId", "text", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Private persistent character profile per authenticated user."
+    },
+    "/online_players/{uid}": {
+      "schema": { "$ref": "#/entities/OnlinePlayer" },
+      "description": "Real-time multiplayer state of online players in rooms."
+    },
+    "/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/ChatMessage" },
+      "description": "Real-time chat history partitioned by roomId."
+    }
+  }
+}
